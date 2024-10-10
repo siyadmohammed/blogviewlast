@@ -1,0 +1,54 @@
+services:
+  db:
+    image: postgres:13
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: ./blog_project/Dockerfile
+    command: gunicorn blog_project.wsgi:application --bind 0.0.0.0:8000
+    volumes:
+      - ./blog_project:/code
+    env_file:
+      - ./.env
+    ports:
+      - "8000:8000"
+    networks:
+      - app-network
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "3000:80"
+    networks:
+      - app-network
+    stdin_open: true
+    tty: true
+
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge
